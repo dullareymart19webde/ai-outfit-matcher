@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/garment.dart';
 
 class ApiService {
-  // If running on an Android emulator, change this to http://10.0.2.2:8000
-  final String baseUrl = 'http://127.0.0.1:8000';
+  // Pointing to your live production backend on Render!
+  final String baseUrl = 'https://ai-outfit-matcher.onrender.com';
 
   Future<List<Garment>> fetchWardrobe() async {
     final response = await http.get(Uri.parse('$baseUrl/wardrobe'));

@@ -8,6 +8,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from pymongo import MongoClient
 
 load_dotenv()
 
@@ -22,12 +23,22 @@ app.add_middleware(
 )
 
 # Initialize Gemini Client
-# It will automatically use the GEMINI_API_KEY environment variable.
 try:
     client = genai.Client()
 except Exception as e:
     client = None
-    print(f"Warning: Could not initialize Gemini Client. Make sure GEMINI_API_KEY is set. Error: {e}")
+    print(f"Warning: Could not initialize Gemini Client. Error: {e}")
+
+# Initialize MongoDB Client
+MONGO_URI = os.getenv("MONGO_URI")
+if MONGO_URI:
+    mongo_client = MongoClient(MONGO_URI)
+    db = mongo_client["outfit_matcher"]
+    wardrobe_collection = db["wardrobe"]
+    print("Connected to MongoDB!")
+else:
+    wardrobe_collection = None
+    print("Warning: MONGO_URI not found. Using in-memory fallback database.")
 
 class Garment(BaseModel):
     id: str
@@ -36,7 +47,7 @@ class Garment(BaseModel):
     color: str
     styleTags: List[str]
 
-# Temporary in-memory storage until we add a real database
+# Fallback database if MongoDB is not connected
 fake_db = [
     Garment(
         id="1",
@@ -51,34 +62,31 @@ fake_db = [
         category="Bottoms",
         color="Blue",
         styleTags=["Casual", "Denim"]
-    ),
-    Garment(
-        id="3",
-        imageUrl="https://images.unsplash.com/photo-1551028719-00167b16eac5?w=500",
-        category="Outerwear",
-        color="Black",
-        styleTags=["Edgy", "Night Out"]
-    ),
-    Garment(
-        id="4",
-        imageUrl="https://images.unsplash.com/photo-1549298916-b41d501d3772?w=500",
-        category="Shoes",
-        color="White",
-        styleTags=["Sporty", "Casual"]
     )
 ]
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to AI Outfit Matcher API"}
+    return {"message": "Welcome to AI Outfit Matcher API (MongoDB Edition)"}
 
 @app.get("/wardrobe", response_model=List[Garment])
 async def get_wardrobe():
+    if wardrobe_collection is not None:
+        docs = wardrobe_collection.find()
+        garments = []
+        for doc in docs:
+            doc.pop('_id', None) # Remove MongoDB's internal ID
+            garments.append(Garment(**doc))
+        return garments
     return fake_db
 
 @app.post("/upload")
 async def upload_garment(garment: Garment):
-    fake_db.append(garment)
+    if wardrobe_collection is not None:
+        doc = garment.model_dump()
+        wardrobe_collection.insert_one(doc)
+    else:
+        fake_db.append(garment)
     return {"message": "Garment uploaded successfully", "garment": garment}
 
 @app.post("/recommendations", response_model=List[Garment])
@@ -86,13 +94,18 @@ async def get_recommendations(base_item: Garment):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API is not configured.")
         
-    # Get all other items in the wardrobe
-    available_items = [g for g in fake_db if g.id != base_item.id]
+    if wardrobe_collection is not None:
+        docs = wardrobe_collection.find({"id": {"$ne": base_item.id}})
+        available_items = []
+        for doc in docs:
+            doc.pop('_id', None)
+            available_items.append(Garment(**doc))
+    else:
+        available_items = [g for g in fake_db if g.id != base_item.id]
     
     if not available_items:
         return []
         
-    # Create a prompt for Gemini
     available_items_json = [g.model_dump() for g in available_items]
     base_item_json = base_item.model_dump()
     
@@ -104,7 +117,7 @@ async def get_recommendations(base_item: Garment):
     {json.dumps(available_items_json, indent=2)}
     
     Select 1 to 2 items from the available wardrobe that would make a great outfit with the base item.
-    Consider color theory, style tags, and category balance (e.g., if the base is a top, recommend bottoms or shoes).
+    Consider color theory, style tags, and category balance.
     
     Return ONLY a JSON list of the 'id's of the recommended items. For example: ["2", "4"]
     """
@@ -117,14 +130,9 @@ async def get_recommendations(base_item: Garment):
                 response_mime_type="application/json",
             ),
         )
-        
-        # Parse the response
         recommended_ids = json.loads(response.text)
-        
-        # Filter the available items to match the recommended IDs
         recommendations = [g for g in available_items if g.id in recommended_ids]
         return recommendations
-        
     except Exception as e:
         print(f"Error calling Gemini: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate recommendations")

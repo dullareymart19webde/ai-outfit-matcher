@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/wardrobe_provider.dart';
 import '../models/garment.dart';
+import '../widgets/smart_image.dart';
 
 final selectedBaseItemProvider = StateProvider<Garment?>((ref) => null);
 
@@ -69,10 +70,11 @@ class _AIStylistScreenState extends ConsumerState<AIStylistScreen> {
                             boxShadow: isSelected ? [
                               BoxShadow(color: Theme.of(context).primaryColor.withValues(alpha: 0.5), blurRadius: 10)
                             ] : [],
-                            image: DecorationImage(
-                              image: CachedNetworkImageProvider(item.imageUrl),
-                              fit: BoxFit.cover,
-                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: SmartImage(
+                            imageUrl: item.imageUrl,
+                            fit: BoxFit.cover,
                           ),
                         ),
                       );
@@ -144,11 +146,13 @@ class _BuildMatchesArea extends ConsumerWidget {
                 children: [
                   ClipRRect(
                     borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
-                    child: CachedNetworkImage(
-                      imageUrl: item.imageUrl,
+                    child: SizedBox(
                       width: 120,
                       height: 140,
-                      fit: BoxFit.cover,
+                      child: SmartImage(
+                        imageUrl: item.imageUrl,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   Expanded(

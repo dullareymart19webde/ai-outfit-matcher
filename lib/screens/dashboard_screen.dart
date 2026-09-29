@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/wardrobe_provider.dart';
 import '../models/garment.dart';
+import '../widgets/smart_image.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -95,18 +96,10 @@ class _GarmentCard extends StatelessWidget {
         child: Stack(
           alignment: Alignment.bottomLeft,
           children: [
-            CachedNetworkImage(
-              imageUrl: item.imageUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                height: 200,
-                color: Theme.of(context).colorScheme.surface,
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
-              errorWidget: (context, url, error) => Container(
-                height: 200,
-                color: Theme.of(context).colorScheme.surface,
-                child: const Icon(Icons.broken_image, color: Colors.white24),
+            Positioned.fill(
+              child: SmartImage(
+                imageUrl: item.imageUrl,
+                fit: BoxFit.cover,
               ),
             ),
             // Gradient Overlay

@@ -110,13 +110,23 @@ async def get_recommendations(base_item: Garment):
     
     # Fetch the actual image so Gemini can physically "look" at it
     import urllib.request
+    import base64
     image_bytes = None
-    try:
-        req = urllib.request.Request(base_item.imageUrl, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            image_bytes = response.read()
-    except Exception as e:
-        print(f"Warning: Could not fetch image for AI analysis: {e}")
+    
+    if base_item.imageUrl.startswith("data:image"):
+        try:
+            # Extract the base64 part: "data:image/jpeg;base64,..."
+            base64_data = base_item.imageUrl.split(',')[1]
+            image_bytes = base64.b64decode(base64_data)
+        except Exception as e:
+            print(f"Warning: Could not decode base64 image: {e}")
+    else:
+        try:
+            req = urllib.request.Request(base_item.imageUrl, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response:
+                image_bytes = response.read()
+        except Exception as e:
+            print(f"Warning: Could not fetch image for AI analysis: {e}")
 
     prompt = f"""
     You are an expert, high-end fashion stylist. 

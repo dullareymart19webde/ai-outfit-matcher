@@ -37,37 +37,30 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   final _formalities = ['Casual', 'Smart Casual', 'Business', 'Formal'];
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800, // Compress it so it fits perfectly in MongoDB!
+      imageQuality: 60,
+    );
     if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
       if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
         setState(() => _webImage = bytes);
       } else {
-        setState(() => _imageFile = File(pickedFile.path));
+        setState(() {
+          _imageFile = File(pickedFile.path);
+          _webImage = bytes; // Save bytes for Base64 conversion
+        });
       }
     }
   }
 
-  Future<String?> _uploadToCloudinary() async {
-    if (_imageFile == null && _webImage == null) return null;
+  Future<String?> _encodeImageToBase64() async {
+    if (_webImage == null) return null;
     
-    final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
-    var request = http.MultipartRequest('POST', url);
-    request.fields['upload_preset'] = 'outfit_uploads';
-    
-    if (kIsWeb) {
-      request.files.add(http.MultipartFile.fromBytes('file', _webImage!, filename: 'upload.jpg'));
-    } else {
-      request.files.add(await http.MultipartFile.fromPath('file', _imageFile!.path));
-    }
-    
-    final response = await request.send();
-    final resBody = await response.stream.bytesToString();
-    if (response.statusCode == 200) {
-      return json.decode(resBody)['secure_url'];
-    } else {
-      throw Exception('Cloudinary Error: $resBody');
-    }
+    // Convert the image bytes directly to a Base64 string!
+    final base64String = base64Encode(_webImage!);
+    return 'data:image/jpeg;base64,$base64String';
   }
 
   @override
@@ -178,8 +171,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     
     setState(() => _isLoading = true);
     try {
-      final imageUrl = await _uploadToCloudinary();
-      if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary");
+      final imageUrl = await _encodeImageToBase64();
+      if (imageUrl == null) throw Exception("Failed to encode image");
 
       final newGarment = Garment(
         id: DateTime.now().millisecondsSinceEpoch.toString(),

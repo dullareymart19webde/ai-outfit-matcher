@@ -107,25 +107,41 @@ async def get_recommendations(base_item: Garment):
         return []
         
     available_items_json = [g.model_dump() for g in available_items]
-    base_item_json = base_item.model_dump()
     
+    # Fetch the actual image so Gemini can physically "look" at it
+    import urllib.request
+    image_bytes = None
+    try:
+        req = urllib.request.Request(base_item.imageUrl, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            image_bytes = response.read()
+    except Exception as e:
+        print(f"Warning: Could not fetch image for AI analysis: {e}")
+
     prompt = f"""
-    You are an expert fashion stylist. The user wants to wear the following base item:
-    {json.dumps(base_item_json, indent=2)}
-    
-    Here are the other items available in their wardrobe:
+    You are an expert, high-end fashion stylist. 
+    I have provided an image of the exact base garment I want to wear. 
+    Please physically analyze the image—look at the specific shade of color, the pattern, the texture, the fabric, and the overall vibe.
+
+    Based on your deep visual analysis of that image, find the absolute best matching items from my available wardrobe below:
     {json.dumps(available_items_json, indent=2)}
     
-    Select 1 to 2 items from the available wardrobe that would make a great outfit with the base item.
-    Consider color theory, style tags, and category balance.
+    Select 1 to 2 items that would make a perfect outfit with the garment in the image.
+    Consider color theory (analogous, complementary), style matching, and category balance.
     
     Return ONLY a JSON list of the 'id's of the recommended items. For example: ["2", "4"]
     """
     
     try:
+        # Pass both the image AND the text prompt to Gemini
+        contents = []
+        if image_bytes:
+            contents.append(types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"))
+        contents.append(prompt)
+
         response = client.models.generate_content(
             model='gemini-2.5-flash',
-            contents=prompt,
+            contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
             ),

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/garment.dart';
 import '../providers/wardrobe_provider.dart';
+import 'ai_stylist_screen.dart'; // import to access selectedBaseItemProvider
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({super.key});
@@ -145,11 +146,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ),
             
             const SizedBox(height: 40),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: _isLoading ? null : _uploadGarment,
-              child: _isLoading 
+              icon: _isLoading ? const SizedBox() : const Icon(Icons.auto_awesome),
+              label: _isLoading 
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Save Garment'),
+                  : const Text('Upload & Find Matches'),
             ),
           ],
         ),
@@ -190,15 +192,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       await ref.read(apiServiceProvider).uploadGarment(newGarment, _removeBackground);
       ref.invalidate(wardrobeProvider);
 
+      // Set the newly uploaded garment as the active AI base item
+      ref.read(selectedBaseItemProvider.notifier).state = newGarment;
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Garment added successfully!'),
-            backgroundColor: Theme.of(context).primaryColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        context.pop();
+        // Go straight to the AI Stylist screen to see the matches!
+        context.go('/stylist');
       }
     } catch (e) {
       if (mounted) {

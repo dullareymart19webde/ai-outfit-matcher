@@ -5,6 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/wardrobe_provider.dart';
 import '../models/garment.dart';
 
+final selectedBaseItemProvider = StateProvider<Garment?>((ref) => null);
+
 class AIStylistScreen extends ConsumerStatefulWidget {
   const AIStylistScreen({super.key});
 
@@ -13,77 +15,96 @@ class AIStylistScreen extends ConsumerStatefulWidget {
 }
 
 class _AIStylistScreenState extends ConsumerState<AIStylistScreen> {
-  Garment? _selectedBaseItem;
-
   @override
   Widget build(BuildContext context) {
     final wardrobeAsync = ref.watch(wardrobeProvider);
+    final selectedBaseItem = ref.watch(selectedBaseItemProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('AI Stylist ✨'),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF121212), Color(0xFF2A004F)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+        title: const Text('AI Stylist', style: TextStyle(fontWeight: FontWeight.w800)),
+        backgroundColor: Colors.transparent,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1E0B33), Color(0xFF0D0D14)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.4],
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          // Select base item horizontal list
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            height: 140,
-            child: wardrobeAsync.when(
-              data: (garments) => ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: garments.length,
-                itemBuilder: (context, index) {
-                  final item = garments[index];
-                  final isSelected = _selectedBaseItem?.id == item.id;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedBaseItem = item),
-                    child: Container(
-                      width: 80,
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
-                          width: 3,
-                        ),
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(item.imageUrl),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Text('Select a base item to build your outfit:', style: TextStyle(color: Colors.white70, fontSize: 14)),
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => const Center(child: Text('Failed to load wardrobe')),
-            ),
+              // Base item selector
+              SizedBox(
+                height: 100,
+                child: wardrobeAsync.when(
+                  data: (garments) => ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: garments.length,
+                    itemBuilder: (context, index) {
+                      final item = garments[index];
+                      final isSelected = selectedBaseItem?.id == item.id;
+                      return GestureDetector(
+                        onTap: () => ref.read(selectedBaseItemProvider.notifier).state = item,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 80,
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+                              width: 3,
+                            ),
+                            boxShadow: isSelected ? [
+                              BoxShadow(color: Theme.of(context).primaryColor.withValues(alpha: 0.5), blurRadius: 10)
+                            ] : [],
+                            image: DecorationImage(
+                              image: CachedNetworkImageProvider(item.imageUrl),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Center(child: Text('Error loading wardrobe: $e')),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // AI Results Area
+              Expanded(
+                child: selectedBaseItem == null
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.auto_awesome, size: 64, color: Colors.white24),
+                            SizedBox(height: 16),
+                            Text(
+                              'Waiting for your selection...',
+                              style: TextStyle(color: Colors.white54, fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _BuildMatchesArea(baseItem: selectedBaseItem),
+              ),
+            ],
           ),
-          const Divider(height: 1, color: Colors.white24),
-          
-          // AI Results Area
-          Expanded(
-            child: _selectedBaseItem == null
-                ? const Center(
-                    child: Text(
-                      'Select an item above to get AI matches',
-                      style: TextStyle(color: Colors.white54, fontSize: 16),
-                    ),
-                  )
-                : _BuildMatchesArea(baseItem: _selectedBaseItem!),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -100,26 +121,33 @@ class _BuildMatchesArea extends ConsumerWidget {
 
     return recommendationsAsync.when(
       data: (recommendations) {
+        if (recommendations.isEmpty) {
+          return const Center(child: Text("No perfect matches found in your wardrobe."));
+        }
         return ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           children: [
-            const Text(
-              'Perfect Matches',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Theme.of(context).colorScheme.secondary),
+                const SizedBox(width: 8),
+                const Text(
+                  'Perfect Matches',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ...recommendations.map((item) => Card(
-              color: Theme.of(context).colorScheme.surface,
               margin: const EdgeInsets.only(bottom: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
                     child: CachedNetworkImage(
                       imageUrl: item.imageUrl,
                       width: 120,
-                      height: 120,
+                      height: 140,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -129,17 +157,20 @@ class _BuildMatchesArea extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.category, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 8),
-                          Text('Color: ${item.color}', style: const TextStyle(color: Colors.white70)),
-                          const SizedBox(height: 8),
+                          Text(item.category.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Theme.of(context).colorScheme.secondary, letterSpacing: 1)),
+                          const SizedBox(height: 4),
+                          Text('Color: ${item.color}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 12),
                           Wrap(
-                            spacing: 4,
-                            children: item.styleTags.map((t) => Chip(
-                              label: Text(t, style: const TextStyle(fontSize: 10)),
-                              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: item.styleTags.map((t) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(t, style: TextStyle(fontSize: 10, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
                             )).toList(),
                           )
                         ],
@@ -150,17 +181,12 @@ class _BuildMatchesArea extends ConsumerWidget {
               ),
             )),
             const SizedBox(height: 24),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.favorite),
-                label: const Text('Save Outfit'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            )
+            ElevatedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.favorite_rounded),
+              label: const Text('Save This Outfit'),
+            ),
+            const SizedBox(height: 40),
           ],
         );
       },
@@ -168,13 +194,25 @@ class _BuildMatchesArea extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text('AI is analyzing your style...', style: TextStyle(color: Theme.of(context).primaryColor)),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 80, height: 80,
+                  child: CircularProgressIndicator(
+                    color: Theme.of(context).primaryColor,
+                    strokeWidth: 2,
+                  ),
+                ),
+                Icon(Icons.auto_awesome, color: Theme.of(context).primaryColor, size: 32),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Text('Gemini is analyzing your style...', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
-      error: (e, s) => const Center(child: Text('Failed to generate matches')),
+      error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.redAccent))),
     );
   }
 }

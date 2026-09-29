@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'screens/dashboard_screen.dart';
 import 'screens/upload_screen.dart';
-import 'screens/ai_stylist_screen.dart';
 
 void main() {
   runApp(
@@ -20,15 +18,7 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const DashboardScreen(),
-    ),
-    GoRoute(
-      path: '/upload',
       builder: (context, state) => const UploadScreen(),
-    ),
-    GoRoute(
-      path: '/stylist',
-      builder: (context, state) => const AIStylistScreen(),
     ),
   ],
 );
@@ -38,29 +28,71 @@ class AIOutfitMatcherApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const primaryNeon = Color(0xFFB026FF);
+    const backgroundDark = Color(0xFF0D0D14);
+    const surfaceDark = Color(0xFF1A1A24);
+
     return MaterialApp.router(
-      title: 'AI Outfit Matcher',
+      title: 'Outfit Matcher',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: const Color(0xFF8A2BE2), // Neon Violet
+        scaffoldBackgroundColor: backgroundDark,
+        primaryColor: primaryNeon,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF8A2BE2),
-          secondary: Color(0xFF00FFFF), // Cyan accent
-          surface: Color(0xFF1E1E1E),
+          primary: primaryNeon,
+          secondary: Color(0xFF00E5FF),
+          surface: surfaceDark,
+          background: backgroundDark,
         ),
-        textTheme: GoogleFonts.poppinsTextTheme(
+        textTheme: GoogleFonts.outfitTextTheme(
           ThemeData.dark().textTheme,
+        ).apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF121212),
+          backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
+          scrolledUnderElevation: 0,
         ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFF8A2BE2),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: primaryNeon,
           foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryNeon,
+            foregroundColor: Colors.white,
+            elevation: 4,
+            shadowColor: primaryNeon.withValues(alpha: 0.5),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: surfaceDark,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: primaryNeon, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        cardTheme: CardThemeData(
+          color: surfaceDark,
+          elevation: 8,
+          shadowColor: Colors.black45,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          clipBehavior: Clip.antiAlias,
         ),
       ),
       routerConfig: _router,

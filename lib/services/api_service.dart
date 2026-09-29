@@ -43,4 +43,18 @@ class ApiService {
       throw Exception('Failed to upload garment');
     }
   }
+
+  Future<String> analyzeGarment(String imageBase64) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/analyze'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'image_base64': imageBase64}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body)['suggestion'];
+    } else {
+      throw Exception('Failed to get AI analysis: ${response.body}');
+    }
+  }
 }

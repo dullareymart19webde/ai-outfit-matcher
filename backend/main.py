@@ -163,6 +163,52 @@ async def get_recommendations(base_item: Garment):
         print(f"Error calling Gemini: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate recommendations")
 
+class AnalyzeRequest(BaseModel):
+    image_base64: str
+
+@app.post("/analyze")
+async def analyze_garment(request: AnalyzeRequest):
+    if not client:
+        raise HTTPException(status_code=500, detail="Gemini API is not configured.")
+        
+    try:
+        import base64
+        base64_data = request.image_base64
+        if "base64," in base64_data:
+            base64_data = base64_data.split("base64,")[1]
+            
+        image_bytes = base64.b64decode(base64_data)
+        
+        prompt = """
+        You are a high-end, expert fashion stylist.
+        The user has provided a photo of a specific piece of clothing.
+        
+        Please physically analyze the item in the image (its color, texture, style, and vibe).
+        Then, suggest 3 distinct, complete outfit combinations that would perfectly match this item.
+        
+        Format your response beautifully using markdown:
+        - Give each outfit a catchy name.
+        - List the specific items they should pair it with.
+        - Briefly explain *why* the colors and styles work well together.
+        
+        Keep it highly engaging, modern, and fashion-forward.
+        """
+        
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            prompt
+        ]
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents
+        )
+        
+        return {"suggestion": response.text}
+    except Exception as e:
+        print(f"Error calling Gemini /analyze: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
